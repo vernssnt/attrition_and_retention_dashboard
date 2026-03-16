@@ -31,7 +31,9 @@ Route::get('/powerbi/risk-data', function () {
             'program',
             'year_level',
             'grade',
-            'attendance'
+            'attendance',
+            'tuition_paid',
+            'tuition_total'
         )
         ->get();
 });
