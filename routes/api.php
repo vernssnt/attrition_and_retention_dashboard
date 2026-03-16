@@ -18,6 +18,20 @@ Route::get('/dashboard-summary', [StudentApiController::class, 'dashboardSummary
 
 Route::get('/risk-distribution', [StudentApiController::class, 'riskDistribution']);
 
+/* Power BI Student Data */
 Route::get('/powerbi/students', function () {
     return DB::table('students')->get();
+});
+
+/* Power BI Risk Data */
+Route::get('/powerbi/risk-data', function () {
+    return DB::table('students')
+        ->select(
+            'id',
+            'program',
+            'year_level',
+            'grade',
+            'attendance'
+        )
+        ->get();
 });
