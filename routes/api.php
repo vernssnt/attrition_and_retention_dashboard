@@ -16,7 +16,21 @@ use App\Http\Controllers\Api\StudentApiController;
 |--------------------------------------------------------------------------
 */
 
-Route::get('/students', [StudentApiController::class, 'index']);
+Route::get('/students', function (Request $request) {
+
+    // Get API key from request header
+    $apiKey = $request->header('X-API-KEY');
+
+    // Check if API key matches
+    if ($apiKey !== env('POWERBI_API_KEY')) {
+        return response()->json([
+            'error' => 'Unauthorized'
+        ], 401);
+    }
+
+    // Return students data if authorized
+    return DB::table('students')->get();
+});
 
 Route::get('/dashboard-summary', [StudentApiController::class, 'dashboardSummary']);
 
