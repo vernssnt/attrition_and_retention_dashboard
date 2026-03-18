@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Api\StudentApiController;
 
+
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -36,4 +37,8 @@ Route::get('/powerbi/risk-data', function () {
             'tuition_total'
         )
         ->get();
+});
+
+Route::get('/powerbi/student-risk-analytics', function () {
+    return DB::table('student_risk_analytics')->get();
 });
