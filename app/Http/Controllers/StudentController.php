@@ -379,7 +379,7 @@ $this->enrollmentService->enroll(
     }
 
     // ✅ Execute query
-    $students = $students->get();
+   $students = $students->paginate(200);
 
     // ✅ Stats
     $totalStudents     = $students->count();
