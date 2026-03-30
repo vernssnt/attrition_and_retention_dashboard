@@ -6,6 +6,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\StudentController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\Api\TriggerFlowController; // ✅ ADD THIS
+use App\Http\Controllers\EnrollmentController;
 
 /*
 |--------------------------------------------------------------------------
@@ -28,7 +29,6 @@ Route::middleware('auth')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])
         ->name('dashboard');
 
-    Route::resource('students', StudentController::class);
 
     Route::post('/students/import', [StudentController::class, 'import'])
         ->name('students.import');
@@ -52,6 +52,22 @@ Route::middleware('auth')->group(function () {
     Route::post('/users/{id}/reset', [UserController::class, 'resetPassword'])
         ->name('users.reset');
 
+        Route::post('/students/add-history', [StudentController::class, 'addHistory'])
+    ->name('students.addHistory');
+    
+    Route::resource('students', StudentController::class);
+    
+    Route::post('/academic-periods', function (\Illuminate\Http\Request $request) {
+    \Illuminate\Support\Facades\DB::table('academic_periods')->insert([
+        'academic_year' => $request->academic_year,
+        'term' => $request->term,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    return response()->json(['success' => true]);
+    
+});
     /*
     |--------------------------------------------------------------------------
     | Power Automate Trigger (Refresh Button)
@@ -60,4 +76,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/trigger-flow', [TriggerFlowController::class, 'runFlow'])
         ->name('trigger.flow');   // ✅ ADD THIS
+
+    
 });
+

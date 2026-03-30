@@ -7,10 +7,10 @@ display:flex;
 min-height:100vh;
 }
 
-.main-content{
-flex:1;
-background:#f4f6f9;
-padding:35px 40px;
+.main-content {
+    flex-grow: 1;
+    background: #f4f6f9;
+    padding: 20px;
 }
 
 .dashboard-wrapper{
@@ -475,12 +475,13 @@ box-shadow:0 2px 8px rgba(0,0,0,0.08);
 /* ================================= */
 
 .sidebar{
-width:230px;
+width:250px;
 background:#1e293b;
 color:white;
 padding:20px 15px;
 display:flex;
 flex-direction:column;
+flex-shrink: 0;
 }
 
 .logo{

@@ -8,136 +8,213 @@ use Illuminate\Http\Request;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Imports\StudentsImport;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use App\Models\Enrollment;
+use App\Services\RiskCalculator;
+use App\Services\EnrollmentService;
 
-class StudentController extends Controller
+
+class StudentController extends Controller {
+    
+    protected $enrollmentService;
+
+    public function __construct(EnrollmentService $enrollmentService)
 {
-    /*
-    |--------------------------------------------------------------------------
-    | RBAC Constructor
-    |--------------------------------------------------------------------------
-    */
-    public function __construct()
-    {
-        // Registrar only
-        $this->middleware('role:registrar')->only([
-            'create',
-            'store',
-            'destroy'
-        ]);
+    $this->enrollmentService = $enrollmentService;
 
-        // Registrar + Cashier
-        $this->middleware('role:registrar,cashier')->only([
-            'edit',
-            'update',
-            'import'
-        ]);
-    }
+    $this->middleware('role:registrar')->only([
+        'create','store','destroy'
+    ]);
 
-    public function index(Request $request)
-    {
-        $students = Student::all();
+    $this->middleware('role:registrar,cashier')->only([
+        'edit','update','import'
+    ]);
+}
 
-        if ($request->filled('risk_level') && $request->risk_level !== 'All') {
-            $students = $students->filter(function ($student) use ($request) {
-                return $student->risk_level === $request->risk_level;
-            });
-        }
-
-        if ($request->filled('year_level') && $request->year_level !== 'All') {
-            $students = $students->where('year_level', $request->year_level);
-        }
-
-        $students = $students->values();
-
-        $totalStudents   = $students->count();
-        $activeStudents  = $students->where('status', 'active')->count();
-        $droppedStudents = $students->where('status', 'dropped')->count();
-
-        $highRisk   = $students->where('risk_level', 'High Risk')->count();
-        $mediumRisk = $students->where('risk_level', 'Medium Risk')->count();
-        $lowRisk    = $students->where('risk_level', 'Low Risk')->count();
-
-        $maleCount   = $students->where('gender', 'Male')->count();
-        $femaleCount = $students->where('gender', 'Female')->count();
-
-        $retentionRate = $totalStudents > 0
-            ? round(($activeStudents / $totalStudents) * 100, 2)
-            : 0;
-
-        return view('students.index', compact(
-            'students',
-            'totalStudents',
-            'activeStudents',
-            'droppedStudents',
-            'highRisk',
-            'mediumRisk',
-            'lowRisk',
-            'maleCount',
-            'femaleCount',
-            'retentionRate'
-        ));
-    }
-
+    /* ================= CREATE ================= */
     public function create()
     {
-        return view('students.create');
-    }
+        $academicPeriods = DB::table('academic_periods')->get();
 
-    public function edit(Student $student)
-    {
-        return view('students.edit', compact('student'));
-    }
+        return view('students.create', compact('academicPeriods'));
+    }   
+    
+    // 👉 ADD YOUR OTHER FUNCTIONS BELOW (store, edit, update, index)
 
-    public function store(Request $request)
-    {
-        $request->validate([
-            'student_no'      => 'required|unique:students,student_no',
-            'first_name'      => 'required|string|max:255',
-            'middle_name'     => 'nullable|string|max:255',
-            'last_name'       => 'required|string|max:255',
-            'program'         => 'required|string|max:255',
-            'year_level'      => 'required',
-            'attendance'      => 'nullable|numeric',
-            'grade'           => 'nullable|numeric',
-            'gender'          => 'nullable|in:Male,Female',
-            'date_of_birth'   => 'nullable|date',
-            'status'          => 'required',
-            'enrollment_year' => 'required|numeric',
-            'tuition_total'   => 'nullable|numeric',
-            'tuition_paid'    => 'nullable|numeric',
-            'has_scholarship' => 'nullable|boolean',
-            'scholarship_type'=> 'required_if:has_scholarship,1|nullable|in:Indigency,Partnership,SHS Graduate'
+
+    /* ================= STORE ================= */
+  public function store(Request $request)
+{
+    DB::beginTransaction();
+
+    try {
+        // ✅ Save student
+        $student = DB::table('students')->insertGetId([
+            'student_no' => $request->student_no,
+            'first_name' => $request->first_name,
+            'middle_name' => $request->middle_name,
+            'last_name' => $request->last_name,
+            'gender' => $request->gender,
+            'date_of_birth' => $request->date_of_birth,
+            'program' => $request->program,
+            'year_level' => $request->year_level,
+            'has_scholarship' => $request->has_scholarship,
+            'scholarship_type' => $request->scholarship_type,
+            'status' => $request->status,
+            'enrollment_year' => $request->enrollment_year,
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
 
-        $student = Student::create([
-            ...$request->all(),
-            'has_scholarship' => $request->has_scholarship ? 1 : 0
-        ]);
+        // ✅ Save academic records
+       if ($request->has('records')) {
+    foreach ($request->records as $record) {
+        if (empty($record['academic_period_id'])) continue;
 
-        $this->logActivity(
-            'Student Created',
-            'Created student: ' . $student->student_no
+        $grade         = ($record['grade'] !== null && $record['grade'] !== '')
+                            ? (float) $record['grade'] : null;
+        $attendance    = ($record['attendance'] !== null && $record['attendance'] !== '')
+                            ? (float) $record['attendance'] : null;
+        $tuition_paid  = (float) ($record['tuition_paid'] ?? 0);
+        $tuition_total = (float) ($record['tuition_total'] ?? 0);
+
+        $financialStatus = ($tuition_total > 0 && $tuition_paid < $tuition_total)
+                            ? 'Low' : 'Paid';
+
+        $studentModel = Student::find($student);
+
+        $this->enrollmentService->enroll(
+            $studentModel,
+            $record['academic_period_id'],
+            $grade,
+            $attendance,
+            $financialStatus,
+            $tuition_paid,
+            $tuition_total
         );
+    }
+}
+
+        DB::commit();
 
         return redirect()->route('students.index')
-            ->with('success', 'Student added successfully.');
-    }
+            ->with('success', 'Student created successfully');
 
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return back()->withErrors($e->getMessage());
+    }
+}
+    /* ================= EDIT ================= */
+   public function edit(Student $student)
+{
+    $enrollments = DB::table('enrollments')
+        ->join('academic_periods', 'enrollments.academic_period_id', '=', 'academic_periods.id')
+        ->where('enrollments.student_id', $student->id)
+        ->select(
+            'enrollments.id', // ✅ VERY IMPORTANT
+            'enrollments.academic_period_id',
+            'enrollments.grade',
+            'enrollments.attendance',
+             'enrollments.tuition_total',
+            'enrollments.tuition_paid',
+            'academic_periods.academic_year',
+            'academic_periods.term'
+        )
+        ->orderBy('academic_periods.academic_year')
+        ->orderBy('academic_periods.id')
+        ->get();
+
+    $academicPeriods = DB::table('academic_periods')->get();
+
+    return view('students.edit', compact('student', 'enrollments', 'academicPeriods'));
+}
+
+    /* ================= UPDATE ================= */
     public function update(Request $request, Student $student)
-    {
+{
+    DB::beginTransaction();
+
+    try {
+
+        // ================= CASHIER =================
         if (Auth::user()->role === 'cashier') {
 
             $request->validate([
-                'tuition_total' => 'nullable|numeric',
-                'tuition_paid'  => 'nullable|numeric',
+                'records.*.tuition_total' => 'nullable|numeric',
+                'records.*.tuition_paid'  => 'nullable|numeric',
             ]);
 
-            $student->update($request->only([
-                'tuition_total',
-                'tuition_paid'
-            ]));
+            if (!empty($request->records)) {
+                foreach ($request->records as $record) {
 
-        } else {
+                    // ✅ UPDATE EXISTING RECORD
+                    if (!empty($record['id'])) {
+
+    $risk = RiskCalculator::calculate(
+        $record['grade'] ?? null,
+        $record['attendance'] ?? null,
+        $record['tuition_total'] ?? 0,
+        $record['tuition_paid'] ?? 0
+    );
+
+    // ✅ ADD THIS HERE
+    $intervention = app(\App\Services\EnrollmentService::class)
+        ->getIntervention(
+            $record['grade'] ?? null,
+            $record['attendance'] ?? null,
+            $record['tuition_paid'] ?? 0,
+            $record['tuition_total'] ?? 0
+        );
+
+    DB::table('enrollments')
+        ->where('id', $record['id'])
+        ->update([
+            'grade' => $record['grade'] ?? null,
+            'attendance' => $record['attendance'] ?? null,
+            'tuition_total' => $record['tuition_total'] ?? 0,
+            'tuition_paid' => $record['tuition_paid'] ?? 0,
+            'adjustment' => $record['adjustment'] ?? 0,
+            'status' => $record['status'] ?? 'Active',
+            'final_risk' => $risk['final_risk'],
+            'risk_level' => $risk['risk_level'],
+            'intervention' => $intervention, // ✅ ADD THIS LINE
+            'updated_at' => now(),
+        ]);
+}
+                    
+
+                    // ✅ INSERT NEW TERM (FIXED HERE)
+                    else {
+
+                        // 🚨 IMPORTANT: use service instead of manual insert
+                      $tuition_paid  = (float) ($record['tuition_paid'] ?? 0);
+$tuition_total = (float) ($record['tuition_total'] ?? 0);
+$grade         = ($record['grade'] !== null && $record['grade'] !== '')
+                    ? (float) $record['grade'] : null;
+$attendance    = ($record['attendance'] !== null && $record['attendance'] !== '')
+                    ? (float) $record['attendance'] : null;
+
+$financialStatus = ($tuition_total > 0 && $tuition_paid < $tuition_total) ? 'Low' : 'Paid';
+
+$this->enrollmentService->enroll(
+    $student,
+    $record['academic_period_id'],
+    $grade,
+    $attendance,
+    $financialStatus,
+    $tuition_paid,
+    $tuition_total
+);
+                    }
+                }
+            }
+
+        }
+        
+
+        // ================= REGISTRAR =================
+        else {
 
             $request->validate([
                 'student_no'      => 'required|unique:students,student_no,' . $student->id,
@@ -146,86 +223,223 @@ class StudentController extends Controller
                 'last_name'       => 'required|string|max:255',
                 'program'         => 'required|string|max:255',
                 'year_level'      => 'required',
-                'attendance'      => 'nullable|numeric',
-                'grade'           => 'nullable|numeric',
                 'gender'          => 'nullable|in:Male,Female',
                 'date_of_birth'   => 'nullable|date',
-                'status'          => 'required',
+                'status'          => 'required|in:Active,Dropped,Graduated',
                 'enrollment_year' => 'required|numeric',
-                'tuition_total'   => 'nullable|numeric',
-                'tuition_paid'    => 'nullable|numeric',
-                'has_scholarship' => 'nullable|boolean',
-                'scholarship_type'=> 'required_if:has_scholarship,1|nullable|in:Indigency,Partnership,SHS Graduate'
+                'has_scholarship' => 'nullable|in:0,1',
+                'scholarship_type'=> 'nullable|in:Indigency,Partnership,SHS Graduate'
             ]);
 
+            // ✅ UPDATE STUDENT
             $student->update([
-                ...$request->only([
-                    'student_no',
-                    'first_name',
-                    'middle_name',
-                    'last_name',
-                    'program',
-                    'year_level',
-                    'attendance',
-                    'grade',
-                    'gender',
-                    'date_of_birth',
-                    'status',
-                    'enrollment_year',
-                    'tuition_total',
-                    'tuition_paid',
-                    'scholarship_type'
-                ]),
-                'has_scholarship' => $request->has_scholarship ? 1 : 0
+                'student_no' => $request->student_no,
+                'first_name' => $request->first_name,
+                'middle_name' => $request->middle_name,
+                'last_name' => $request->last_name,
+                'program' => $request->program,
+                'year_level' => $request->year_level,
+                'gender' => $request->gender,
+                'date_of_birth' => $request->date_of_birth,
+                'status' => $request->status,
+                'enrollment_year' => $request->enrollment_year,
+                'has_scholarship' => $request->input('has_scholarship', 0),
+                'scholarship_type' => $request->scholarship_type,
             ]);
+
+            if (!empty($request->records)) {
+                foreach ($request->records as $record) {
+
+                    if (
+                        empty($record['academic_period_id']) &&
+                        empty($record['grade']) &&
+                        empty($record['attendance']) &&
+                        empty($record['tuition_total']) &&
+                        empty($record['tuition_paid'])
+                    ) {
+                        continue;
+                    }
+
+                    // ✅ UPDATE EXISTING
+                    if (!empty($record['id'])) {
+
+                        $risk = RiskCalculator::calculate(
+                            $record['grade'] ?? null,
+                            $record['attendance'] ?? null,
+                            $record['tuition_total'] ?? 0,
+                            $record['tuition_paid'] ?? 0
+                        );
+                        $intervention = app(\App\Services\EnrollmentService::class)
+    ->getIntervention(
+        $record['grade'] ?? null,
+        $record['attendance'] ?? null,
+        $record['tuition_paid'] ?? 0,
+        $record['tuition_total'] ?? 0
+    );
+
+                        DB::table('enrollments')
+                            ->where('id', $record['id'])
+                            ->update([
+                                'grade' => $record['grade'] ?? null,
+                                'attendance' => $record['attendance'] ?? null,
+                                'tuition_total' => $record['tuition_total'] ?? 0,
+                                'tuition_paid' => $record['tuition_paid'] ?? 0,
+                                'adjustment' => $record['adjustment'] ?? 0,
+                                'status' => $record['status'] ?? 'Active',
+                                'final_risk' => $risk['final_risk'],
+                                'risk_level' => $risk['risk_level'],
+                                'intervention' => $intervention,
+                                'updated_at' => now(),
+                            ]);
+                    }
+
+                    // ✅ INSERT NEW TERM (FIXED)
+                    else {
+
+                       $tuition_paid  = (float) ($record['tuition_paid'] ?? 0);
+$tuition_total = (float) ($record['tuition_total'] ?? 0);
+$grade         = ($record['grade'] !== null && $record['grade'] !== '')
+                    ? (float) $record['grade'] : null;
+$attendance    = ($record['attendance'] !== null && $record['attendance'] !== '')
+                    ? (float) $record['attendance'] : null;
+
+$financialStatus = ($tuition_total > 0 && $tuition_paid < $tuition_total) ? 'Low' : 'Paid';
+
+$this->enrollmentService->enroll(
+    $student,
+    $record['academic_period_id'],
+    $grade,
+    $attendance,
+    $financialStatus,
+    $tuition_paid,
+    $tuition_total
+);
+                    }
+                }
+            }
         }
 
-        $this->logActivity(
-            'Student Updated',
-            'Updated student: ' . $student->student_no
-        );
+        DB::commit();
 
         return redirect()->route('students.index')
             ->with('success', 'Student updated successfully.');
+
+    } catch (\Exception $e) {
+        DB::rollback();
+        return back()->with('error', $e->getMessage());
     }
+    
+}
 
-    public function destroy(Student $student)
-    {
-        $studentNo = $student->student_no;
-        $student->delete();
-
-        $this->logActivity(
-            'Student Deleted',
-            'Deleted student: ' . $studentNo
+    public function index(Request $request) 
+{
+    $students = DB::table('students')
+        ->leftJoin('enrollments as e', function ($join) {
+    $join->on('students.id', '=', 'e.student_id')
+        ->whereRaw('e.id = (
+            SELECT id FROM enrollments
+            WHERE student_id = students.id
+            ORDER BY id DESC
+            LIMIT 1
+        )');
+})
+        ->select(
+            'students.*',
+             DB::raw("COALESCE(e.year_level::text, students.year_level) as year_level"),
+            'e.attendance',
+            'e.grade',
+            'students.status as enrollment_status',
+            'e.final_risk',
+            'e.risk_level',
+            'e.intervention'
         );
 
-        return redirect()->route('students.index')
-            ->with('success', 'Student deleted successfully.');
+    if ($request->filled('risk_level') && $request->risk_level !== '') {
+        $students->where('e.risk_level', $request->risk_level);
     }
 
-    public function import(Request $request)
-    {
-        $request->validate([
-            'file' => 'required|mimes:xlsx,csv'
-        ]);
-
-        Excel::import(new StudentsImport, $request->file('file'));
-
-        $this->logActivity(
-            'Excel Imported',
-            'Uploaded student Excel file'
-        );
-
-        return redirect()->route('students.index')
-            ->with('success', 'Excel file imported successfully.');
+    if ($request->filled('year_level') && $request->year_level !== '') {
+    $yearMap = [
+        '1st year' => 1,
+        '2nd year' => 2,
+        '3rd year' => 3,
+        '4th year' => 4,
+    ];
+    $yearInt = $yearMap[$request->year_level] ?? null;
+    if ($yearInt) {
+        $students->where('e.year_level', $yearInt);
     }
+}
+    if ($request->filled('status') && $request->status !== '') {
+    $students->where('students.status', $request->status);
+}
+    $students = $students->get();
 
-    private function logActivity($action, $description)
-    {
-        ActivityLog::create([
-            'user_id' => Auth::id(),
-            'action' => $action,
-            'description' => $description,
-        ]);
-    }
+$totalStudents     = $students->count();
+$activeStudents    = $students->filter(fn($s) => strtolower($s->enrollment_status ?? '') === 'active')->count();
+$droppedStudents   = $students->filter(fn($s) => strtolower($s->enrollment_status ?? '') === 'dropped')->count();
+$graduatedStudents = $students->filter(fn($s) => strtolower($s->enrollment_status ?? '') === 'graduated')->count();
+
+$highRisk   = $students->filter(fn($s) => ($s->risk_level ?? '') === 'High')->count();
+$mediumRisk = $students->filter(fn($s) => ($s->risk_level ?? '') === 'Medium')->count();
+$lowRisk    = $students->filter(fn($s) => ($s->risk_level ?? '') === 'Low')->count();
+
+$maleCount   = $students->where('gender', 'Male')->count();
+$femaleCount = $students->where('gender', 'Female')->count();
+
+$retentionRate = $totalStudents > 0
+    ? round(($activeStudents / $totalStudents) * 100, 2)
+    : 0;
+
+
+    $studentHistories = DB::table('enrollments')
+        ->join('academic_periods', 'enrollments.academic_period_id', '=', 'academic_periods.id')
+        ->select(
+            'enrollments.student_id',
+            'academic_periods.academic_year',
+            'academic_periods.term',
+            'enrollments.final_risk'
+        )
+        ->orderBy('academic_periods.id')
+        ->get()
+        ->groupBy('student_id');
+
+    return view('students.index', compact(
+    'students',
+    'totalStudents',
+    'activeStudents',
+    'droppedStudents',
+    'graduatedStudents',
+    'highRisk',
+    'mediumRisk',
+    'lowRisk',
+    'maleCount',
+    'femaleCount',
+    'retentionRate',
+    'studentHistories'
+));
+}
+// AFTER (fixed)
+public function import(Request $request)
+{
+
+    $request->validate([
+        'file' => 'required|mimes:xlsx,csv'
+    ]);
+
+    \Maatwebsite\Excel\Facades\Excel::import(
+        new \App\Imports\StudentsImport,  // ← import class (arg 1)
+        $request->file('file')            // ← the file (arg 2)
+    );
+
+    return back()->with('success', 'Students imported successfully!');
+}
+public function destroy($id)
+{
+    $student = \App\Models\Student::findOrFail($id);
+
+    $student->delete();
+
+    return redirect()->back()->with('success', 'Student deleted successfully.');
+}
 }

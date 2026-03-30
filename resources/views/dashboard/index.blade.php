@@ -149,8 +149,8 @@
 <tbody>
 @foreach($attritionByYear as $item)
 <tr>
-<td>{{ $item->enrollment_year }}</td>
-<td>{{ $item->total }}</td>
+<td>{{ $item['academic_year'] }}</td>
+<td>{{ $item['total'] }}</td>
 </tr>
 @endforeach
 </tbody>
@@ -181,8 +181,8 @@
 <tbody>
 @foreach($retentionByProgram as $item)
 <tr>
-<td>{{ $item->program }}</td>
-<td>{{ $item->total }}</td>
+<td>{{ $item['program'] }}</td>
+<td>{{ $item['total'] }}</td>
 </tr>
 @endforeach
 </tbody>
@@ -206,11 +206,9 @@
 
 <div class="powerbi-container">
 
-<iframe
-title="Student Retention Power BI Dashboard"
-src="https://app.powerbi.com/reportEmbed?reportId=ff936772-9205-4827-9ec5-194589d7b698&autoAuth=true&ctid=df76b1f1-5ea1-4e51-86ef-48f7b8f5ec9c"
-allowfullscreen>
-</iframe>
+<iframe title="dashboard pramis" 
+width="1140" height="541" src="https://app.powerbi.com/view?r=eyJrIjoiMzUzYmUwOGItNmFjMi00Yjg1LWFlNjUtZTY3NjFmYjE0ZjJiIiwidCI6ImRmNzZiMWYxLTVlYTEtNGU1MS04NmVmLTQ4ZjdiOGY1ZWM5YyIsImMiOjEwfQ%3D%3D" frameborder="0" allowFullScreen="true"></iframe>
+
 
 </div>
 

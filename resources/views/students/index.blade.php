@@ -98,14 +98,9 @@ Upload File
 </div>
 
 </div>
+<iframe title="dashboard pramis" 
+width="1140" height="541" src="https://app.powerbi.com/view?r=eyJrIjoiMzUzYmUwOGItNmFjMi00Yjg1LWFlNjUtZTY3NjFmYjE0ZjJiIiwidCI6ImRmNzZiMWYxLTVlYTEtNGU1MS04NmVmLTQ4ZjdiOGY1ZWM5YyIsImMiOjEwfQ%3D%3D" frameborder="0" allowFullScreen="true"></iframe>
 
-<iframe title="Risk Distribution Dashboard"
-width="1140"
-height="541"
-src="https://app.powerbi.com/reportEmbed?reportId=b1af95dd-160c-457a-bf4a-f6ed34e55e60&autoAuth=true&ctid=df76b1f1-5ea1-4e51-86ef-48f7b8f5ec9c"
-frameborder="0"
-allowFullScreen="true">
-</iframe>
 
 <hr>
 
@@ -122,9 +117,19 @@ class="toolbar-search"
 
 <select name="risk_level" class="toolbar-select">
 <option value="">All Risk</option>
-<option value="High Risk" {{ request('risk_level') == 'High Risk' ? 'selected' : '' }}>High Risk</option>
-<option value="Medium Risk" {{ request('risk_level') == 'Medium Risk' ? 'selected' : '' }}>Medium Risk</option>
-<option value="Low Risk" {{ request('risk_level') == 'Low Risk' ? 'selected' : '' }}>Low Risk</option>
+
+<option value="High" {{ request('risk_level') == 'High' ? 'selected' : '' }}>
+    High
+</option>
+
+<option value="Medium" {{ request('risk_level') == 'Medium' ? 'selected' : '' }}>
+    Medium
+</option>
+
+<option value="Low" {{ request('risk_level') == 'Low' ? 'selected' : '' }}>
+    Low
+</option>
+
 </select>
 
 <select name="year_level" class="toolbar-select">
@@ -134,6 +139,7 @@ class="toolbar-search"
 <option value="3rd year" {{ request('year_level') == '3rd year' ? 'selected' : '' }}>3rd year</option>
 <option value="4th year" {{ request('year_level') == '4th year' ? 'selected' : '' }}>4th year</option>
 </select>
+
 
 <button type="submit" class="toolbar-btn apply-btn">Apply</button>
 
@@ -163,7 +169,7 @@ Reset
 <th>Student No</th>
 <th>Name</th>
 <th>Program</th>
-<th>Year</th>
+<th>Year Level</th>
 <th>Attendance</th>
 <th>Grade</th>
 <th>Risk</th>
@@ -177,6 +183,13 @@ Reset
 
 @foreach ($students as $student)
 
+@php
+$latest = DB::table('enrollments')
+    ->where('student_id', $student->id)
+    ->latest('id')
+    ->first();
+@endphp
+
 <tr class="student-row" data-id="{{ $student->id }}">
 
 <td class="toggle-icon">▶</td>
@@ -185,23 +198,29 @@ Reset
 <td>{{ $student->first_name }} {{ $student->last_name }}</td>
 <td>{{ $student->program }}</td>
 <td>{{ $student->year_level }}</td>
-<td>{{ $student->attendance ?? 'N/A' }}%</td>
-<td>{{ $student->grade ?? 'N/A' }}</td>
+
+<td>{{ $latest->attendance ?? 'N/A' }}%</td>
+<td>{{ $latest->grade ?? 'N/A' }}</td>
 
 <td>
-@if($student->risk_level === 'High Risk')
-<span class="risk-badge risk-high">High</span>
-@elseif($student->risk_level === 'Medium Risk')
-<span class="risk-badge risk-medium">Medium</span>
+@php
+    $score = $student->final_risk ?? 0;
+@endphp
+
+@if($score >= 8)
+    <span class="risk-badge risk-high">High</span>
+
+@elseif($score >= 5)
+    <span class="risk-badge risk-medium">Medium</span>
+
 @else
-<span class="risk-badge risk-low">Low</span>
+    <span class="risk-badge risk-low">Low</span>
 @endif
 </td>
-
 <td>
 
 @php
-$intervention = strtolower($student->intervention_recommendation ?? '');
+$intervention = strtolower($student->intervention ?? '');
 @endphp
 
 @if(str_contains($intervention,'academic') && str_contains($intervention,'financial'))
@@ -223,13 +242,16 @@ $intervention = strtolower($student->intervention_recommendation ?? '');
 
 <td>
 
+{{-- EDIT --}}
 @if(auth()->user()->role !== 'viewer')
 <a href="{{ route('students.edit', $student->id) }}" class="action-btn edit-btn">
 Edit
 </a>
 @endif
-</a>
 
+
+
+{{-- DELETE --}}
 <form action="{{ route('students.destroy', $student->id) }}"
 method="POST"
 style="display:inline;">
@@ -283,14 +305,26 @@ Delete
 <div class="details-section">
 <h4>Financial</h4>
 
+{{-- ✅ GET LATEST ENROLLMENT --}}
+@php
+$tuition_total = $latest->tuition_total ?? 0;
+$tuition_paid = $latest->tuition_paid ?? 0;
+
+$tuition_balance = $tuition_total - $tuition_paid;
+
+$unpaid_percentage = $tuition_total > 0 
+    ? ($tuition_balance / $tuition_total) * 100
+    : 0;
+@endphp
+
 <div class="details-item">
 <span>Tuition Balance</span>
-<strong>₱{{ number_format($student->tuition_balance,2) }}</strong>
+<strong>₱{{ number_format($tuition_balance,2) }}</strong>
 </div>
 
 <div class="details-item">
 <span>Unpaid %</span>
-<strong>{{ $student->unpaid_percentage }}%</strong>
+<strong>{{ number_format($unpaid_percentage, 2) }}%</strong>
 </div>
 
 <div class="details-item">
@@ -311,8 +345,42 @@ Delete
 
 <h4>Risk Analysis</h4>
 
+<div class="details-section">
+<h4>Academic History</h4>
+
 @php
-$score = $student->risk_score ?? 0;
+    $history = $studentHistories[$student->id] ?? [];
+@endphp
+
+@if(count($history) > 0)
+
+<ul style="padding-left: 18px;">
+
+@foreach($history as $record)
+<li>
+    <strong>{{ $record->academic_year }} - {{ $record->term }}</strong>
+    → Risk: 
+    @if($record->final_risk >= 8)
+        <span style="color:red;">High</span>
+    @elseif($record->final_risk >= 5)
+        <span style="color:orange;">Medium</span>
+    @else
+        <span style="color:green;">Low</span>
+    @endif
+    ({{ $record->final_risk }}/10)
+</li>
+@endforeach
+
+</ul>
+
+@else
+<p>No history available</p>
+@endif
+
+</div>
+
+@php
+$score = $student->final_risk ?? 0;
 $width = $score * 10;
 @endphp
 
@@ -323,7 +391,7 @@ $width = $score * 10;
 <div class="risk-bar">
 
 <div class="risk-bar-fill
-@if($score >= 10) risk-high
+@if($score >= 8) risk-high
 @elseif($score >= 5) risk-medium
 @else risk-low
 @endif
@@ -349,32 +417,34 @@ style="width: {{ $width }}%">
 
 <ul class="strategic-plan">
 
-{{-- Academic Risk --}}
-@if(($student->grade ?? 0) >= 3.0)
+{{-- ✅ GET LATEST ENROLLMENT DATA --}}
+@php
+$grade = $latest->grade ?? 0;
+$attendance = $latest->attendance ?? 100;
+$tuition_total = $latest->tuition_total ?? 0;
+$tuition_paid = $latest->tuition_paid ?? 0;
+
+$paidPercent = $tuition_total > 0 
+    ? ($tuition_paid / $tuition_total) * 100 
+    : 100;
+@endphp
+
+
+{{-- ✅ Academic Risk --}}
+@if($grade >= 3.0)
 <li>📘 Recommend Academic Tutoring Program</li>
 <li>👨‍🏫 Schedule consultation with Academic Advisor</li>
 @endif
 
-{{-- Attendance Risk --}}
-@if(($student->attendance ?? 100) < 85)
+
+{{-- ✅ Attendance Risk --}}
+@if($attendance < 85)
 <li>📅 Schedule Guidance Counseling for Attendance Monitoring</li>
 @endif
 
-@php
-$paidPercent = ($student->tuition_total > 0) 
-    ? ($student->tuition_paid / $student->tuition_total) * 100 
-    : 100;
-@endphp
-
-{{-- Financial Risk --}}
+{{-- ✅ Financial Risk (UPDATED) --}}
 @if($paidPercent < 50)
-<li>💰 Refer student to Financial Aid Office</li>
-<li>📄 Offer installment payment plan</li>
-@endif
-
-{{-- High Overall Risk --}}
-@if(($student->risk_score ?? 0) >= 8)
-<li>⚠ Intensive monitoring by Student Affairs</li>
+<li>💰 Offer installment payment plan</li>
 @endif
 
 </ul>

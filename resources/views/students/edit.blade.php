@@ -6,6 +6,16 @@
 
 <h2>Edit Student</h2>
 
+@if ($errors->any())
+    <div style="color:red;">
+        <ul>
+            @foreach ($errors->all() as $error)
+                <li>{{ $error }}</li>
+            @endforeach
+        </ul>
+    </div>
+@endif
+
 <form method="POST" action="{{ route('students.update', $student->id) }}">
     @csrf
     @method('PUT')
@@ -54,26 +64,6 @@
            value="{{ old('year_level', $student->year_level) }}" required>
     <br><br>
 
-    <label>Attendance (%)</label><br>
-    <input type="number" step="0.01" name="attendance" 
-           value="{{ old('attendance', $student->attendance) }}" required>
-    <br><br>
-
-    <label>Grade</label><br>
-    <input type="number" step="0.01" name="grade" 
-           value="{{ old('grade', $student->grade) }}" required>
-    <br><br>
-
-    {{-- 💰 TUITION SECTION --}}
-    <label>Tuition Total</label><br>
-    <input type="number" step="0.01" name="tuition_total" 
-           value="{{ old('tuition_total', $student->tuition_total) }}">
-    <br><br>
-
-    <label>Tuition Paid</label><br>
-    <input type="number" step="0.01" name="tuition_paid" 
-           value="{{ old('tuition_paid', $student->tuition_paid) }}">
-    <br><br>
 
     {{-- ✅ HAS SCHOLARSHIP --}}
     <label>Has Scholarship?</label><br>
@@ -106,40 +96,119 @@
     </div>
 
     <label>Status</label><br>
-    <select name="status">
-        <option value="active" {{ old('status', $student->status) == 'active' ? 'selected' : '' }}>
-            Active
-        </option>
-        <option value="dropped" {{ old('status', $student->status) == 'dropped' ? 'selected' : '' }}>
-            Dropped
-        </option>
-    </select>
-    <br><br>
+<select name="status">
+    <option value="Active"    {{ old('status', $student->status) == 'Active'    ? 'selected' : '' }}>Active</option>
+    <option value="Dropped"   {{ old('status', $student->status) == 'Dropped'   ? 'selected' : '' }}>Dropped</option>
+    <option value="Graduated" {{ old('status', $student->status) == 'Graduated' ? 'selected' : '' }}>Graduated</option>
+</select>
+<br><br>
 
     <label>Enrollment Year</label><br>
     <input type="number" name="enrollment_year"
            value="{{ old('enrollment_year', $student->enrollment_year) }}">
     <br><br>
 
-    <button type="submit">Update Student</button>
+    <h3>Academic Records</h3>
+    
 
-</form>
+
+<div id="records-container">
+
+    @if($enrollments->isEmpty())
+
+    <div class="record-row">
+
+        <select name="records[0][academic_period_id]" required>
+            <option value="">Select Term</option>
+            @foreach($academicPeriods as $period)
+                <option value="{{ $period->id }}">
+                    {{ $period->academic_year }} - {{ $period->term }}
+                </option>
+            @endforeach
+        </select>
+
+        <input type="number" step="0.01" name="records[0][grade]" placeholder="Grade">
+        <input type="number" step="0.01" name="records[0][attendance]" placeholder="Attendance">
+        <input type="number" step="0.01" name="records[0][tuition_total]" placeholder="Tuition Total">
+        <input type="number" step="0.01" name="records[0][tuition_paid]" placeholder="Tuition Paid">
+
+    </div>
+
+@endif
+
+    @foreach($enrollments as $index => $record)
+    <div class="record-row">
+
+    <!-- ✅ REQUIRED -->
+    <input type="hidden" name="records[{{ $index }}][id]" value="{{ $record->id }}">
+    <input type="hidden" name="records[{{ $index }}][academic_period_id]" value="{{ $record->academic_period_id }}">
+
+    <input type="text" value="{{ $record->academic_year }}" readonly>
+    <input type="text" value="{{ $record->term }}" readonly>
+
+    <input name="records[{{ $index }}][grade]" value="{{ $record->grade }}">
+    <input name="records[{{ $index }}][attendance]" value="{{ $record->attendance }}">
+    <input type="number" step="0.01"
+    name="records[{{ $index }}][tuition_total]"
+    placeholder="Tuition Total"
+    value="{{ $record->tuition_total > 0 ? $record->tuition_total : '' }}">
+
+<input type="number" step="0.01"
+    name="records[{{ $index }}][tuition_paid]"
+    placeholder="Tuition Paid"
+    value="{{ $record->tuition_paid > 0 ? $record->tuition_paid : '' }}">
+
+</div>
+    @endforeach
+
+</div>
+
+<br>
+<button type="button" onclick="addRecord()">+ Add Term</button>
+
+<br><br>
+<button type="submit">Update Student</button>
 
 {{-- ✅ Auto Show / Hide Scholarship Type --}}
 <script>
-function toggleScholarshipType() {
-    const hasScholarship = document.getElementById('has_scholarship').value;
-    const container = document.getElementById('scholarship_type_container');
-
-    container.style.display = hasScholarship == 1 ? 'block' : 'none';
-}
-
 document.addEventListener('DOMContentLoaded', function () {
-    toggleScholarshipType();
-});
 
-document.getElementById('has_scholarship')
-    .addEventListener('change', toggleScholarshipType);
+    let recordIndex = Date.now(); // ✅ FIX
+
+    window.addRecord = function () {
+
+        const container = document.getElementById('records-container');
+
+        if (!container) {
+            console.error('records-container not found');
+            return;
+        }
+
+        let html = `
+        <div class="record-row" style="margin-bottom:10px;">
+
+            <select name="records[${recordIndex}][academic_period_id]" required>
+                <option value="">Select Term</option>
+                @foreach($academicPeriods as $period)
+                    <option value="{{ $period->id }}">
+                        {{ $period->academic_year }} - {{ $period->term }}
+                    </option>
+                @endforeach
+            </select>
+
+            <input type="number" step="0.01" name="records[${recordIndex}][grade]" placeholder="Grade">
+            <input type="number" step="0.01" name="records[${recordIndex}][attendance]" placeholder="Attendance">
+            <input type="number" step="0.01" name="records[${recordIndex}][tuition_total]" placeholder="Tuition Total">
+            <input type="number" step="0.01" name="records[${recordIndex}][tuition_paid]" placeholder="Tuition Paid">
+
+        </div>
+        `;
+
+        container.insertAdjacentHTML('beforeend', html);
+        recordIndex++;
+    };
+
+});
 </script>
 
 @endsection
