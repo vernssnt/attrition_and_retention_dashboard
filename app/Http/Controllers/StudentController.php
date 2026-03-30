@@ -333,19 +333,20 @@ $this->enrollmentService->enroll(
 
     public function index(Request $request) 
 {
+    // ✅ Step 1: Get latest enrollment per student
+    $latestEnrollments = DB::table('enrollments')
+        ->select('student_id', DB::raw('MAX(id) as latest_id'))
+        ->groupBy('student_id');
+
+    // ✅ Step 2: Main query
     $students = DB::table('students')
-        ->leftJoin('enrollments as e', function ($join) {
-    $join->on('students.id', '=', 'e.student_id')
-        ->whereRaw('e.id = (
-            SELECT id FROM enrollments
-            WHERE student_id = students.id
-            ORDER BY id DESC
-            LIMIT 1
-        )');
-})
+        ->leftJoinSub($latestEnrollments, 'latest_enrollments', function ($join) {
+            $join->on('students.id', '=', 'latest_enrollments.student_id');
+        })
+        ->leftJoin('enrollments as e', 'e.id', '=', 'latest_enrollments.latest_id')
         ->select(
             'students.*',
-             DB::raw("COALESCE(e.year_level::text, students.year_level) as year_level"),
+            DB::raw("COALESCE(e.year_level::text, students.year_level) as year_level"),
             'e.attendance',
             'e.grade',
             'students.status as enrollment_status',
@@ -354,44 +355,50 @@ $this->enrollmentService->enroll(
             'e.intervention'
         );
 
+    // ✅ Filters
     if ($request->filled('risk_level') && $request->risk_level !== '') {
         $students->where('e.risk_level', $request->risk_level);
     }
 
     if ($request->filled('year_level') && $request->year_level !== '') {
-    $yearMap = [
-        '1st year' => 1,
-        '2nd year' => 2,
-        '3rd year' => 3,
-        '4th year' => 4,
-    ];
-    $yearInt = $yearMap[$request->year_level] ?? null;
-    if ($yearInt) {
-        $students->where('e.year_level', $yearInt);
+        $yearMap = [
+            '1st year' => 1,
+            '2nd year' => 2,
+            '3rd year' => 3,
+            '4th year' => 4,
+        ];
+        $yearInt = $yearMap[$request->year_level] ?? null;
+
+        if ($yearInt) {
+            $students->where('e.year_level', $yearInt);
+        }
     }
-}
+
     if ($request->filled('status') && $request->status !== '') {
-    $students->where('students.status', $request->status);
-}
+        $students->where('students.status', $request->status);
+    }
+
+    // ✅ Execute query
     $students = $students->get();
 
-$totalStudents     = $students->count();
-$activeStudents    = $students->filter(fn($s) => strtolower($s->enrollment_status ?? '') === 'active')->count();
-$droppedStudents   = $students->filter(fn($s) => strtolower($s->enrollment_status ?? '') === 'dropped')->count();
-$graduatedStudents = $students->filter(fn($s) => strtolower($s->enrollment_status ?? '') === 'graduated')->count();
+    // ✅ Stats
+    $totalStudents     = $students->count();
+    $activeStudents    = $students->filter(fn($s) => strtolower($s->enrollment_status ?? '') === 'active')->count();
+    $droppedStudents   = $students->filter(fn($s) => strtolower($s->enrollment_status ?? '') === 'dropped')->count();
+    $graduatedStudents = $students->filter(fn($s) => strtolower($s->enrollment_status ?? '') === 'graduated')->count();
 
-$highRisk   = $students->filter(fn($s) => ($s->risk_level ?? '') === 'High')->count();
-$mediumRisk = $students->filter(fn($s) => ($s->risk_level ?? '') === 'Medium')->count();
-$lowRisk    = $students->filter(fn($s) => ($s->risk_level ?? '') === 'Low')->count();
+    $highRisk   = $students->filter(fn($s) => ($s->risk_level ?? '') === 'High')->count();
+    $mediumRisk = $students->filter(fn($s) => ($s->risk_level ?? '') === 'Medium')->count();
+    $lowRisk    = $students->filter(fn($s) => ($s->risk_level ?? '') === 'Low')->count();
 
-$maleCount   = $students->where('gender', 'Male')->count();
-$femaleCount = $students->where('gender', 'Female')->count();
+    $maleCount   = $students->where('gender', 'Male')->count();
+    $femaleCount = $students->where('gender', 'Female')->count();
 
-$retentionRate = $totalStudents > 0
-    ? round(($activeStudents / $totalStudents) * 100, 2)
-    : 0;
+    $retentionRate = $totalStudents > 0
+        ? round(($activeStudents / $totalStudents) * 100, 2)
+        : 0;
 
-
+    // ✅ Student history
     $studentHistories = DB::table('enrollments')
         ->join('academic_periods', 'enrollments.academic_period_id', '=', 'academic_periods.id')
         ->select(
@@ -405,19 +412,19 @@ $retentionRate = $totalStudents > 0
         ->groupBy('student_id');
 
     return view('students.index', compact(
-    'students',
-    'totalStudents',
-    'activeStudents',
-    'droppedStudents',
-    'graduatedStudents',
-    'highRisk',
-    'mediumRisk',
-    'lowRisk',
-    'maleCount',
-    'femaleCount',
-    'retentionRate',
-    'studentHistories'
-));
+        'students',
+        'totalStudents',
+        'activeStudents',
+        'droppedStudents',
+        'graduatedStudents',
+        'highRisk',
+        'mediumRisk',
+        'lowRisk',
+        'maleCount',
+        'femaleCount',
+        'retentionRate',
+        'studentHistories'
+    ));
 }
 // AFTER (fixed)
 public function import(Request $request)
