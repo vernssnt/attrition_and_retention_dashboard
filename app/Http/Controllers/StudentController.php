@@ -333,28 +333,34 @@ $this->enrollmentService->enroll(
 
     public function index(Request $request) 
 {
+    ini_set('memory_limit', '512M');
     set_time_limit(150); // 120 seconds
     // ✅ Step 1: Get latest enrollment per student
-    $latestEnrollments = DB::table('enrollments')
-        ->select('student_id', DB::raw('MAX(id) as latest_id'))
-        ->groupBy('student_id');
+$latestEnrollments = DB::table('enrollments')
+    ->select('student_id', 'academic_period_id', DB::raw('MAX(id) as latest_id'))
+    ->groupBy('student_id', 'academic_period_id');
 
-    // ✅ Step 2: Main query
-    $students = DB::table('students')
-        ->leftJoinSub($latestEnrollments, 'latest_enrollments', function ($join) {
-            $join->on('students.id', '=', 'latest_enrollments.student_id');
-        })
-        ->leftJoin('enrollments as e', 'e.id', '=', 'latest_enrollments.latest_id')
-        ->select(
-            'students.*',
-            DB::raw("COALESCE(e.year_level::text, students.year_level) as year_level"),
-            'e.attendance',
-            'e.grade',
-            'students.status as enrollment_status',
-            'e.final_risk',
-            'e.risk_level',
-            'e.intervention'
-        );
+// ✅ Step 2: Main query
+$students = DB::table('students')
+    ->leftJoinSub($latestEnrollments, 'latest_enrollments', function ($join) {
+        $join->on('students.id', '=', 'latest_enrollments.student_id');
+    })
+    ->leftJoin('enrollments as e', 'e.id', '=', 'latest_enrollments.latest_id')
+    ->leftJoin('academic_periods as ap', 'ap.id', '=', 'latest_enrollments.academic_period_id')
+    ->select(
+        'students.*',
+        DB::raw("COALESCE(e.year_level::text, students.year_level) as year_level"),
+        'e.attendance',
+        'e.grade',
+        'e.tuition_total',  // 👈 add
+        'e.tuition_paid',
+        'students.status as enrollment_status',
+        'e.final_risk',
+        'e.risk_level',
+        'e.intervention',
+        'ap.academic_year',
+        'ap.term'
+    );
 
     // ✅ Filters
     if ($request->filled('risk_level') && $request->risk_level !== '') {
@@ -378,6 +384,13 @@ $this->enrollmentService->enroll(
     if ($request->filled('status') && $request->status !== '') {
         $students->where('students.status', $request->status);
     }
+    if ($request->filled('academic_year') && $request->academic_year !== '') {
+    $students->where('ap.academic_year', $request->academic_year);
+}
+
+if ($request->filled('term') && $request->term !== '') {
+    $students->where('ap.term', $request->term);
+}
 
     // ✅ Execute query
     $students = $students->get();
@@ -411,9 +424,15 @@ $this->enrollmentService->enroll(
         ->orderBy('academic_periods.id')
         ->get()
         ->groupBy('student_id');
+        $academicYears = DB::table('academic_periods')
+    ->select('academic_year')
+    ->distinct()
+    ->orderByDesc('academic_year')
+    ->pluck('academic_year');
 
     return view('students.index', compact(
         'students',
+        'academicYears',
         'totalStudents',
         'activeStudents',
         'droppedStudents',

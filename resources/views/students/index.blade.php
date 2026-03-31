@@ -137,6 +137,21 @@ class="toolbar-search"
 <option value="3rd year" {{ request('year_level') == '3rd year' ? 'selected' : '' }}>3rd year</option>
 <option value="4th year" {{ request('year_level') == '4th year' ? 'selected' : '' }}>4th year</option>
 </select>
+<select name="academic_year" class="toolbar-select">
+    <option value="">All Academic Years</option>
+    @foreach($academicYears as $year)
+        <option value="{{ $year }}" {{ request('academic_year') == $year ? 'selected' : '' }}>
+            {{ $year }}
+        </option>
+    @endforeach
+</select>
+
+<select name="term" class="toolbar-select">
+    <option value="">All Terms</option>
+    <option value="Term 1" {{ request('term') == 'Term 1' ? 'selected' : '' }}>Term 1</option>
+    <option value="Term 2" {{ request('term') == 'Term 2' ? 'selected' : '' }}>Term 2</option>
+    <option value="Term 3" {{ request('term') == 'Term 3' ? 'selected' : '' }}>Term 3</option>
+</select>
 
 
 <button type="submit" class="toolbar-btn apply-btn">Apply</button>
@@ -181,13 +196,6 @@ Reset
 
 @foreach ($students as $student)
 
-@php
-$latest = DB::table('enrollments')
-    ->where('student_id', $student->id)
-    ->latest('id')
-    ->first();
-@endphp
-
 <tr class="student-row" data-id="{{ $student->id }}">
 
 <td class="toggle-icon">▶</td>
@@ -197,8 +205,8 @@ $latest = DB::table('enrollments')
 <td>{{ $student->program }}</td>
 <td>{{ $student->year_level }}</td>
 
-<td>{{ $latest->attendance ?? 'N/A' }}%</td>
-<td>{{ $latest->grade ?? 'N/A' }}</td>
+<td>{{ $student->attendance ?? 'N/A' }}%</td>
+<td>{{ $student->grade ?? 'N/A' }}</td>
 
 <td>
 @php
