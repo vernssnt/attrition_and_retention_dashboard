@@ -379,57 +379,37 @@ $this->enrollmentService->enroll(
     }
 
     // ✅ Execute query
-    $students = $students->paginate(100);
+    $students = $students->get();
 
     // ✅ Stats
-   $totalStudents = DB::table('students')->count();
+    $totalStudents     = $students->count();
+    $activeStudents    = $students->filter(fn($s) => strtolower($s->enrollment_status ?? '') === 'active')->count();
+    $droppedStudents   = $students->filter(fn($s) => strtolower($s->enrollment_status ?? '') === 'dropped')->count();
+    $graduatedStudents = $students->filter(fn($s) => strtolower($s->enrollment_status ?? '') === 'graduated')->count();
 
-$activeStudents = DB::table('students')
-    ->where('status', 'Active')
-    ->count();
+    $highRisk   = $students->filter(fn($s) => ($s->risk_level ?? '') === 'High')->count();
+    $mediumRisk = $students->filter(fn($s) => ($s->risk_level ?? '') === 'Medium')->count();
+    $lowRisk    = $students->filter(fn($s) => ($s->risk_level ?? '') === 'Low')->count();
 
-$droppedStudents = DB::table('students')
-    ->where('status', 'Dropped')
-    ->count();
-
-$graduatedStudents = DB::table('students')
-    ->where('status', 'Graduated')
-    ->count();
-
-    $riskCounts = DB::table('enrollments')
-    ->select('risk_level', DB::raw('COUNT(*) as count'))
-    ->groupBy('risk_level')
-    ->pluck('count', 'risk_level');
-
-$highRisk   = $riskCounts['High'] ?? 0;
-$mediumRisk = $riskCounts['Medium'] ?? 0;
-$lowRisk    = $riskCounts['Low'] ?? 0;
-
-    $maleCount = DB::table('students')
-    ->where('gender', 'Male')
-    ->count();
-
-$femaleCount = DB::table('students')
-    ->where('gender', 'Female')
-    ->count();
+    $maleCount   = $students->where('gender', 'Male')->count();
+    $femaleCount = $students->where('gender', 'Female')->count();
 
     $retentionRate = $totalStudents > 0
         ? round(($activeStudents / $totalStudents) * 100, 2)
         : 0;
 
     // ✅ Student history
-   $studentHistories = DB::table('enrollments')
-    ->join('academic_periods', 'enrollments.academic_period_id', '=', 'academic_periods.id')
-    ->select(
-        'enrollments.student_id',
-        'academic_periods.academic_year',
-        'academic_periods.term',
-        'enrollments.final_risk'
-    )
-    ->whereIn('enrollments.student_id', $students->pluck('id'))
-    ->orderBy('academic_periods.id')
-    ->get()
-    ->groupBy('student_id');
+    $studentHistories = DB::table('enrollments')
+        ->join('academic_periods', 'enrollments.academic_period_id', '=', 'academic_periods.id')
+        ->select(
+            'enrollments.student_id',
+            'academic_periods.academic_year',
+            'academic_periods.term',
+            'enrollments.final_risk'
+        )
+        ->orderBy('academic_periods.id')
+        ->get()
+        ->groupBy('student_id');
 
     return view('students.index', compact(
         'students',
