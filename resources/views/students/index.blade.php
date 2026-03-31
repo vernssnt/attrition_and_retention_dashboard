@@ -97,9 +97,7 @@ Upload File
 </div>
 </div>
 
-</div>
-<iframe title="dashboard pramis" 
-width="1140" height="541" src="<iframe title="dashboard pramis_backup_ulet" width="600" height="373.5" src="https://app.powerbi.com/view?r=eyJrIjoiNjkzYWQ2NjktMWZmZC00NTU5LThhZTUtMjExZWFjYWExMTIxIiwidCI6ImRmNzZiMWYxLTVlYTEtNGU1MS04NmVmLTQ4ZjdiOGY1ZWM5YyIsImMiOjEwfQ%3D%3D" frameborder="0" allowFullScreen="true"></iframe>" frameborder="0" allowFullScreen="true"></iframe>
+<<iframe title="dashboard pramis_backup_ulet" width="1140" height="541" src="https://app.powerbi.com/view?r=eyJrIjoiNjkzYWQ2NjktMWZmZC00NTU5LThhZTUtMjExZWFjYWExMTIxIiwidCI6ImRmNzZiMWYxLTVlYTEtNGU1MS04NmVmLTQ4ZjdiOGY1ZWM5YyIsImMiOjEwfQ%3D%3D" frameborder="0" allowFullScreen="true"></iframe>
 
 
 <hr>
