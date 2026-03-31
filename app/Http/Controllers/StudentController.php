@@ -396,12 +396,22 @@ $graduatedStudents = DB::table('students')
     ->where('status', 'Graduated')
     ->count();
 
-    $highRisk   = $students->filter(fn($s) => ($s->risk_level ?? '') === 'High')->count();
-    $mediumRisk = $students->filter(fn($s) => ($s->risk_level ?? '') === 'Medium')->count();
-    $lowRisk    = $students->filter(fn($s) => ($s->risk_level ?? '') === 'Low')->count();
+    $riskCounts = DB::table('enrollments')
+    ->select('risk_level', DB::raw('COUNT(*) as count'))
+    ->groupBy('risk_level')
+    ->pluck('count', 'risk_level');
 
-    $maleCount   = $students->where('gender', 'Male')->count();
-    $femaleCount = $students->where('gender', 'Female')->count();
+$highRisk   = $riskCounts['High'] ?? 0;
+$mediumRisk = $riskCounts['Medium'] ?? 0;
+$lowRisk    = $riskCounts['Low'] ?? 0;
+
+    $maleCount = DB::table('students')
+    ->where('gender', 'Male')
+    ->count();
+
+$femaleCount = DB::table('students')
+    ->where('gender', 'Female')
+    ->count();
 
     $retentionRate = $totalStudents > 0
         ? round(($activeStudents / $totalStudents) * 100, 2)
