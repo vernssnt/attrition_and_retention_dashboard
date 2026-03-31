@@ -333,6 +333,7 @@ $this->enrollmentService->enroll(
 
     public function index(Request $request) 
 {
+    set_time_limit(150); // 120 seconds
     // ✅ Step 1: Get latest enrollment per student
     $latestEnrollments = DB::table('enrollments')
         ->select('student_id', DB::raw('MAX(id) as latest_id'))
