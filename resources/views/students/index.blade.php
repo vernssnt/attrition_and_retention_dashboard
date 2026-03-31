@@ -196,6 +196,13 @@ Reset
 
 @foreach ($students as $student)
 
+@php
+$latest = DB::table('enrollments')
+    ->where('student_id', $student->id)
+    ->latest('id')
+    ->first();
+@endphp
+
 <tr class="student-row" data-id="{{ $student->id }}">
 
 <td class="toggle-icon">▶</td>
@@ -205,8 +212,8 @@ Reset
 <td>{{ $student->program }}</td>
 <td>{{ $student->year_level }}</td>
 
-<td>{{ $student->attendance ?? 'N/A' }}%</td>
-<td>{{ $student->grade ?? 'N/A' }}</td>
+<td>{{ $latest->attendance ?? 'N/A' }}%</td>
+<td>{{ $latest->grade ?? 'N/A' }}</td>
 
 <td>
 @php
