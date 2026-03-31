@@ -379,13 +379,22 @@ $this->enrollmentService->enroll(
     }
 
     // ✅ Execute query
-    $students = $students->get();
+    $students = $students->paginate(100);
 
     // ✅ Stats
-    $totalStudents     = $students->count();
-    $activeStudents    = $students->filter(fn($s) => strtolower($s->enrollment_status ?? '') === 'active')->count();
-    $droppedStudents   = $students->filter(fn($s) => strtolower($s->enrollment_status ?? '') === 'dropped')->count();
-    $graduatedStudents = $students->filter(fn($s) => strtolower($s->enrollment_status ?? '') === 'graduated')->count();
+   $totalStudents = DB::table('students')->count();
+
+$activeStudents = DB::table('students')
+    ->where('status', 'Active')
+    ->count();
+
+$droppedStudents = DB::table('students')
+    ->where('status', 'Dropped')
+    ->count();
+
+$graduatedStudents = DB::table('students')
+    ->where('status', 'Graduated')
+    ->count();
 
     $highRisk   = $students->filter(fn($s) => ($s->risk_level ?? '') === 'High')->count();
     $mediumRisk = $students->filter(fn($s) => ($s->risk_level ?? '') === 'Medium')->count();
@@ -399,17 +408,18 @@ $this->enrollmentService->enroll(
         : 0;
 
     // ✅ Student history
-    $studentHistories = DB::table('enrollments')
-        ->join('academic_periods', 'enrollments.academic_period_id', '=', 'academic_periods.id')
-        ->select(
-            'enrollments.student_id',
-            'academic_periods.academic_year',
-            'academic_periods.term',
-            'enrollments.final_risk'
-        )
-        ->orderBy('academic_periods.id')
-        ->get()
-        ->groupBy('student_id');
+   $studentHistories = DB::table('enrollments')
+    ->join('academic_periods', 'enrollments.academic_period_id', '=', 'academic_periods.id')
+    ->select(
+        'enrollments.student_id',
+        'academic_periods.academic_year',
+        'academic_periods.term',
+        'enrollments.final_risk'
+    )
+    ->whereIn('enrollments.student_id', $students->pluck('id'))
+    ->orderBy('academic_periods.id')
+    ->get()
+    ->groupBy('student_id');
 
     return view('students.index', compact(
         'students',
