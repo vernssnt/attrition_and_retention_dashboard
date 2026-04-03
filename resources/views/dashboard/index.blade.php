@@ -90,42 +90,56 @@
 {{-- KPI SUMMARY CARDS --}}
 {{-- ========================================================= --}}
 
-<div class="row g-3 mb-4">
+<div class="row g-2 mb-4">
 
-<div class="col-lg-2 col-md-4 col-sm-6">
-<div class="card shadow-sm text-center p-3">
-<h4>{{ $totalStudents }}</h4>
-<small class="text-muted">Total Students</small>
-</div>
-</div>
+    <div class="col">
+        <div class="card text-center p-3">
+            <h4 class="mb-0">{{ $totalStudents }}</h4>
+            <small class="text-muted">Total Students</small>
+        </div>
+    </div>
 
-<div class="col-lg-2 col-md-4 col-sm-6">
-<div class="card shadow-sm text-center p-3">
-<h4>{{ $activeStudents }}</h4>
-<small class="text-muted">Active Students</small>
-</div>
-</div>
+    <div class="col">
+        <div class="card text-center p-3">
+            <h4 class="mb-0">{{ $activeStudents }}</h4>
+            <small class="text-muted">Active Students</small>
+        </div>
+    </div>
 
-<div class="col-lg-2 col-md-4 col-sm-6">
-<div class="card shadow-sm text-center p-3">
-<h4>{{ $droppedStudents }}</h4>
-<small class="text-muted">Dropped Students</small>
-</div>
-</div>
+    <div class="col">
+        <div class="card text-center p-3 bg-warning-subtle">
+            <h4 class="mb-0 text-warning">{{ $droppedStudents }}</h4>
+            <small class="text-muted">Dropped Students</small>
+        </div>
+    </div>
 
-<div class="col-lg-3 col-md-6">
-<div class="card shadow-sm text-center p-3 bg-success-subtle">
-<h4 class="text-success">{{ number_format($retentionRate,2) }}%</h4>
-<small class="text-muted">Retention Rate</small>
-</div>
-</div>
+    <div class="col">
+        <div class="card text-center p-3 bg-info-subtle">
+            <h4 class="mb-0 text-info">{{ $graduatedStudents }}</h4>
+            <small class="text-muted">Graduated Students</small>
+        </div>
+    </div>
 
-<div class="col-lg-3 col-md-6">
-<div class="card shadow-sm text-center p-3 bg-danger-subtle">
-<h4 class="text-danger">{{ number_format($attritionRate,2) }}%</h4>
-<small class="text-muted">Attrition Rate</small>
-</div>
-</div>
+    <div class="col">
+        <div class="card text-center p-3 bg-success-subtle">
+            <h4 class="mb-0 text-success">{{ number_format($retentionRate, 2) }}%</h4>
+            <small class="text-muted">Retention Rate</small>
+        </div>
+    </div>
+
+    <div class="col">
+        <div class="card text-center p-3 bg-danger-subtle">
+            <h4 class="mb-0 text-danger">{{ number_format($attritionRate, 2) }}%</h4>
+            <small class="text-muted">Attrition Rate</small>
+        </div>
+    </div>
+
+    <div class="col">
+        <div class="card text-center p-3 bg-success-subtle">
+            <h4 class="mb-0 text-success">{{ number_format($graduationRate, 2) }}%</h4>
+            <small class="text-muted">Graduation Rate</small>
+        </div>
+    </div>
 
 </div>
 

@@ -61,6 +61,16 @@ $droppedStudents = $students
     ->pluck('id')
     ->unique()
     ->count();
+    // ADD THESE:
+$graduatedStudents = $students
+    ->filter(fn($s) => strtolower(trim($s->enrollment_status ?? '')) === 'graduated')
+    ->pluck('id')
+    ->unique()
+    ->count();
+
+$graduationRate = $totalStudents > 0
+    ? round(($graduatedStudents / $totalStudents) * 100, 2)
+    : 0;
 
     // ================= RISK COUNTS =================
     $highRisk = $students->filter(fn($s) =>
@@ -150,6 +160,8 @@ $droppedStudents = $students
         'totalStudents',
         'activeStudents',
         'droppedStudents',
+        'graduatedStudents',   // ← ADD
+        'graduationRate',
         'retentionRate',
         'attritionRate',
         'attritionByYear',
